@@ -1,0 +1,892 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HataFuRotto - 見守り活動・挨拶運動シフト表作成ツール</title>
+  <style id="printPageStyle">
+    @page { size: A4 portrait; margin: 7mm 8mm; }
+  </style>
+  <style>
+    :root {
+      --primary: #1F497D;
+      --primary-light: #eef3f8;
+      --accent: #C55A11;
+      --accent-light: #fff3e6;
+      --danger: #dc3545;
+      --gray-bg: #f8f9fa;
+      --gray-border: #ccc;
+      --text-main: #333;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Hiragino Sans", "Meiryo", sans-serif; }
+    body { background-color: var(--gray-bg); color: var(--text-main); padding: 12px; }
+    .container { max-width: 1040px; margin: 0 auto; background: #fff; border-radius: 8px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    
+    .brand-bar { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 2px solid var(--primary); padding-bottom: 6px; margin-bottom: 12px; }
+    h1 { font-size: 1.25rem; color: var(--primary); margin: 0; }
+    .tagline { font-size: 0.8rem; color: #666; font-weight: normal; }
+
+    h2 { font-size: 0.95rem; color: var(--primary); margin-top: 10px; margin-bottom: 6px; }
+    
+    .card { background: #fafafa; border: 1px solid var(--gray-border); border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; }
+    @media (max-width: 700px) { .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; } }
+
+    .form-group { margin-bottom: 8px; }
+    label { display: block; font-weight: bold; font-size: 0.8rem; margin-bottom: 2px; color: #444; }
+    input[type="text"], input[type="date"], select, textarea {
+      width: 100%; padding: 6px 8px; border: 1px solid var(--gray-border); border-radius: 4px; font-size: 0.9rem;
+    }
+    textarea { height: 130px; resize: vertical; line-height: 1.4; }
+    textarea.msg-area { height: 85px; }
+    textarea.error-border { border-color: var(--danger) !important; background-color: #fff8f8; }
+    .help-text { font-size: 0.72rem; color: #666; margin-top: 2px; }
+    .alert-error { color: var(--danger); font-size: 0.78rem; font-weight: bold; margin-top: 3px; display: none; }
+
+    /* 曜日チェックボックス */
+    .weekday-group { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+    .weekday-item { display: flex; align-items: center; gap: 3px; font-size: 0.85rem; font-weight: bold; background: #fff; border: 1px solid var(--gray-border); padding: 4px 8px; border-radius: 4px; }
+    .weekday-item input { margin: 0; }
+
+    /* 操作ボタン */
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+    button {
+      padding: 9px 12px; border: none; border-radius: 5px; font-weight: bold; font-size: 0.85rem; cursor: pointer; transition: 0.2s;
+    }
+    .btn-primary { background: var(--primary); color: #fff; flex: 1; min-width: 140px; }
+    .btn-secondary { background: #5a6268; color: #fff; }
+    .btn-success { background: #28a745; color: #fff; }
+    .btn-outline { background: #fff; border: 1px solid var(--gray-border); color: #333; }
+    button:active { opacity: 0.8; }
+
+    /* 保存ステータス表示バッジ */
+    .save-status { font-size: 0.75rem; padding: 2px 6px; border-radius: 3px; margin-left: 8px; vertical-align: middle; }
+    .status-saved { background: #e2f0d9; color: #385723; }
+    .status-unsaved { background: #fce4d6; color: #c65911; font-weight: bold; }
+
+    /* 回数集計アコーディオン */
+    .accordion-toggle {
+      width: 100%; background: #eef3f8; color: var(--primary); border: 1px solid #b8daff;
+      border-radius: 6px; padding: 9px 14px; text-align: left; font-size: 0.88rem; font-weight: bold;
+      cursor: pointer; display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;
+    }
+    .accordion-toggle:hover { background: #e2eaf4; }
+    .accordion-content {
+      max-height: 0; overflow: hidden; opacity: 0;
+      transition: max-height 0.35s ease, opacity 0.3s ease, margin-bottom 0.35s ease; margin-bottom: 0;
+    }
+    .accordion-content.open { max-height: 400px; opacity: 1; margin-bottom: 12px; }
+    .summary-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 6px; padding: 4px 0; }
+    .summary-item { background: #fff; border: 1px solid var(--gray-border); border-radius: 4px; padding: 4px; text-align: center; font-size: 0.8rem; }
+
+    /* シフト表ヘッダー・フッター・連絡先枠（画面＆印刷） */
+    .sheet-top-date { text-align: right; font-size: 0.8rem; color: #444; margin-bottom: 2px; }
+    .sheet-header { margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 6px; }
+    .sheet-title { font-size: 1.25rem; font-weight: bold; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
+    .sheet-meta-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    .sheet-meta-table td { border: 1px solid #777; padding: 4px 8px; }
+    .sheet-meta-label { background: #eee; font-weight: bold; width: 12%; text-align: center; }
+
+    .sheet-msg-box {
+      border: 1px solid #777; background: #fff; border-radius: 4px;
+      padding: 6px 10px; font-size: 0.8rem; line-height: 1.45; white-space: pre-wrap; margin-bottom: 8px;
+    }
+    .sheet-footer-box { margin-top: 8px; margin-bottom: 6px; }
+    .sheet-contact-box {
+      border: 1px dashed #777; background: #fafafa; border-radius: 4px;
+      padding: 5px 10px; font-size: 0.8rem; line-height: 1.4; white-space: pre-wrap; margin-top: 4px;
+    }
+
+    /* 多段組テーブルレイアウト（行高固定・月日と曜統合） */
+    .columns-container { display: flex; gap: 6px; align-items: flex-start; width: 100%; }
+    .column-table-wrapper { flex: 1; min-width: 0; }
+    table.schedule-table { width: 100%; border-collapse: collapse; table-layout: fixed; }
+    table.schedule-table th, table.schedule-table td {
+      border: 1px solid #777; padding: 0 3px; text-align: center;
+      height: 27px; line-height: 25px; box-sizing: border-box;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; vertical-align: middle; font-size: 0.8rem;
+    }
+    table.schedule-table th { background: #e9ecef; font-weight: bold; }
+    
+    /* 状態別行スタイル */
+    tr.row-holiday { background-color: #e9ecef !important; color: #6c757d; }
+    tr.row-special { background-color: var(--accent-light); }
+    .badge-special { font-size: 0.68rem; font-weight: bold; color: var(--accent); margin-right: 2px; }
+
+    /* A4印刷スタイル */
+    @media print {
+      body { background: #fff; padding: 0; font-size: 9pt; }
+      .container { box-shadow: none; border: none; padding: 0; max-width: 100%; }
+      .card, .btn-group, .brand-bar, .accordion-toggle, .accordion-content { display: none !important; }
+      .sheet-top-date { font-size: 7.5pt; margin-bottom: 1px; }
+      .sheet-header { margin-bottom: 4px; padding-bottom: 2px; }
+      .sheet-title { font-size: 1.15rem; margin-bottom: 3px; }
+      .sheet-meta-table { font-size: 7.8pt; }
+      .sheet-meta-table td { padding: 2px 4px; }
+      .sheet-msg-box { font-size: 7.2pt; padding: 3px 6px; margin-bottom: 5px; line-height: 1.35; }
+      .sheet-footer-box { margin-top: 5px; margin-bottom: 3px; }
+      .sheet-contact-box { font-size: 7.2pt; padding: 3px 6px; }
+      .columns-container { gap: 4px; }
+      table.schedule-table th, table.schedule-table td {
+        font-size: 7.5pt; height: 23px; line-height: 21px; padding: 0 2px;
+      }
+      .badge-special { font-size: 6.5pt; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="brand-bar">
+    <h1>🚩 HataFuRotto <span class="tagline">- 見守り活動・挨拶運動シフト表作成</span></h1>
+    <span id="saveStatusBadge" class="save-status status-saved">変更なし</span>
+  </div>
+
+  <!-- 設定カード -->
+  <div class="card">
+    <h2>1. 表題・基本情報・用紙設定</h2>
+    <div class="grid-4">
+      <div class="form-group" style="grid-column: span 2;">
+        <label>表題（タイトル）</label>
+        <input type="text" id="scheduleTitle" value="">
+      </div>
+      <div class="form-group">
+        <label>作成日（ヘッダ右上に表示）</label>
+        <input type="text" id="scheduleCreatedDate" value="">
+      </div>
+      <div class="form-group">
+        <label>印刷用紙の向き</label>
+        <select id="printOrientation" onchange="updatePrintPageStyle()">
+          <option value="portrait" selected>縦向き（A4縦）</option>
+          <option value="landscape">横向き（A4横・多段向け）</option>
+        </select>
+      </div>
+    </div>
+    <div class="grid-3">
+      <div class="form-group">
+        <label>地区名</label>
+        <input type="text" id="metaDistrict" value="第1地区">
+      </div>
+      <div class="form-group">
+        <label>活動場所</label>
+        <input type="text" id="metaLocation" value="〇〇交差点・小学校正門前">
+      </div>
+      <div class="form-group">
+        <label>活動時間</label>
+        <input type="text" id="metaTime" value="7:55 〜 8:25">
+      </div>
+    </div>
+
+    <h2>2. 日程・曜日・段組み設定</h2>
+    <div class="grid-3">
+      <div class="form-group">
+        <label>開始日（開いた当日を自動設定）</label>
+        <input type="date" id="startDate">
+      </div>
+      <div class="form-group">
+        <label>終了日（約半年後を自動設定）</label>
+        <input type="date" id="endDate">
+      </div>
+      <div class="form-group">
+        <label>印刷・表示の列数（段組み）</label>
+        <select id="layoutColumns">
+          <option value="1">1段（単一列）</option>
+          <option value="2" selected>2段（2列・週2回半年推奨）</option>
+          <option value="3">3段（3列・A4縦）</option>
+          <option value="4">4段（4列・横向き推奨）</option>
+          <option value="5">5段（5列・横向き推奨）</option>
+          <option value="6">6段（6列・横向き推奨）</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="form-group">
+      <label>見守り実施曜日（複数選択可）</label>
+      <div class="weekday-group">
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="1" checked> 月</label>
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="2"> 火</label>
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="3" checked> 水</label>
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="4"> 木</label>
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="5"> 金</label>
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="6"> 土</label>
+        <label class="weekday-item"><input type="checkbox" name="weekday" value="0"> 日</label>
+      </div>
+    </div>
+
+    <h2>3. 連絡事項・校外委員連絡先（空欄なら非表示）</h2>
+    <div class="grid-2">
+      <div class="form-group">
+        <label>ヘッダー連絡事項（シフト表上部に表示）</label>
+        <textarea id="headerMsg" class="msg-area">・旗振り終了後、シフト表の本日の欄に〇をつけてください
+・シフト表、旗、ビブス等の旗振りセットは、次のシフトに間に合うように次の方へ回してください
+・未就学児を連れて見守りされる方は、安全な場所で活動してください</textarea>
+      </div>
+      <div class="form-group">
+        <label>フッター連絡事項（シフト表下部に表示）</label>
+        <textarea id="footerMsg" class="msg-area">●当番日に活動できない場合
+ ・保護者間で調整する
+ ・知人に依頼する
+ ・都合の良い別日に活動する
+いずれの場合も、念のため校外委員までご一報ください。</textarea>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>校外委員連絡先（フッター下に表示・空欄なら非表示）</label>
+      <input type="text" id="contactMsg" value="校外委員連絡先：〇〇地区担当 鈴木（TEL: 090-XXXX-XXXX / LINEまたはメール）">
+    </div>
+
+    <h2>4. 名簿・祝日・特別追加枠（重複チェック付き）</h2>
+    <div class="grid-3">
+      <div class="form-group">
+        <label>名簿メンバー（改行区切り）</label>
+        <textarea id="memberList">山田
+佐藤
+鈴木
+高橋
+田中
+伊藤
+渡辺
+小林</textarea>
+        <div id="duplicateAlert" class="alert-error">⚠️ 氏名の重複があります: <span id="duplicateNames"></span></div>
+        <div class="help-text">※学校がある日に上から順に自動循環します。</div>
+      </div>
+
+      <div class="form-group">
+        <label>祝日・学校休校日（日付,理由）</label>
+        <textarea id="holidayList"></textarea>
+        <div class="help-text">※開いた年・翌年の祝日を自動抽出しています。学校独自の休みも追記可能です。</div>
+      </div>
+
+      <div class="form-group">
+        <label>特別追加枠（日付,担当者,事由）</label>
+        <textarea id="specialList"></textarea>
+        <div class="help-text">※担当者を空欄（例: <code>2026-10-15,,重点日</code>）にすると通常名簿から自動割り当てします。</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 操作ボタン群 -->
+  <div class="btn-group">
+    <button class="btn-primary" onclick="generateSchedule()">🔄 シフト作成・再描画</button>
+    <button class="btn-success" onclick="handlePrint()">🖨️ A4印刷 / PDF保存</button>
+    <button class="btn-outline" onclick="copyForLine()">📋 LINE送信用コピー</button>
+    <button class="btn-secondary" onclick="exportJSON()">💾 設定を保存</button>
+    <button class="btn-secondary" onclick="document.getElementById('importFile').click()">📂 設定を読み込み</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importJSON(event)">
+  </div>
+
+  <!-- 当番回数アコーディオン -->
+  <button type="button" class="accordion-toggle" onclick="toggleSummary()">
+    <span>📊 各自の当番回数を確認（※印刷物には含まれません）</span>
+    <span id="accordionArrow">▼</span>
+  </button>
+  <div id="summaryAccordion" class="accordion-content">
+    <div class="card" style="margin-bottom:0;">
+      <div id="summaryContainer" class="summary-grid"></div>
+    </div>
+  </div>
+
+  <!-- 印刷＆表示用：最上部作成日 -->
+  <div class="sheet-top-date" id="displayCreatedDate"></div>
+
+  <!-- 印刷＆表示用：シフト表先頭ヘッダー -->
+  <div class="sheet-header">
+    <div class="sheet-title" id="displayTitle"></div>
+    <table class="sheet-meta-table">
+      <tr>
+        <td class="sheet-meta-label">地区</td>
+        <td id="displayDistrict" style="width: 21%;">第1地区</td>
+        <td class="sheet-meta-label">場所</td>
+        <td id="displayLocation" style="width: 32%;">〇〇交差点・小学校正門前</td>
+        <td class="sheet-meta-label">時間</td>
+        <td id="displayTime" style="width: 23%;">7:55 〜 8:25</td>
+      </tr>
+      <tr>
+        <td class="sheet-meta-label">実施曜日</td>
+        <td id="displayWeekdays" colspan="5">月曜・水曜（学校休校日・祝日を除く）</td>
+      </tr>
+    </table>
+  </div>
+
+  <!-- ヘッダー連絡事項（未入力なら非表示） -->
+  <div id="displayHeaderMsg" class="sheet-msg-box" style="display:none;"></div>
+
+  <!-- 多段組みシフト表コンテナ -->
+  <div id="scheduleContainer" class="columns-container"></div>
+
+  <!-- フッター連絡事項（未入力なら非表示） -->
+  <div id="displayFooterMsg" class="sheet-msg-box sheet-footer-box" style="display:none;"></div>
+
+  <!-- 校外委員連絡先欄（未入力なら非表示） -->
+  <div id="displayContactMsg" class="sheet-contact-box" style="display:none;"></div>
+</div>
+
+<script>
+  let generatedData = [];
+  const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
+  
+  // 未保存・未印刷ガード用フラグ
+  let isDirty = false;
+
+  function markDirty() {
+    isDirty = true;
+    const badge = document.getElementById('saveStatusBadge');
+    if (badge) {
+      badge.innerText = '● 未保存の変更あり';
+      badge.className = 'save-status status-unsaved';
+    }
+  }
+
+  function markSaved() {
+    isDirty = false;
+    const badge = document.getElementById('saveStatusBadge');
+    if (badge) {
+      badge.innerText = '保存／印刷済み';
+      badge.className = 'save-status status-saved';
+    }
+  }
+
+  // ページ離脱・リロード時の確認ガード
+  window.addEventListener('beforeunload', function (e) {
+    if (isDirty) {
+      e.preventDefault();
+      e.returnValue = ''; // ブラウザ標準の「このサイトを離れますか？」を表示
+      return '';
+    }
+  });
+
+  window.onload = function() {
+    initDynamicDates();
+    updatePrintPageStyle();
+    checkMemberDuplicates();
+    generateSchedule();
+
+    // 入力変更監視（ユーザーが手動変更したらダーティフラグをセット）
+    const inputs = document.querySelectorAll('input, select, textarea');
+    inputs.forEach(el => {
+      el.addEventListener('input', markDirty);
+      el.addEventListener('change', markDirty);
+    });
+
+    document.getElementById('memberList').addEventListener('input', checkMemberDuplicates);
+
+    // 初回ロード時は未変更状態にする
+    markSaved();
+  };
+
+  function updatePrintPageStyle() {
+    const orientation = document.getElementById('printOrientation').value;
+    const styleEl = document.getElementById('printPageStyle');
+    const margin = orientation === 'landscape' ? '6mm 8mm' : '7mm 8mm';
+    styleEl.innerHTML = `@page { size: A4 ${orientation}; margin: ${margin}; }`;
+  }
+
+  function initDynamicDates() {
+    const today = new Date();
+    const y = today.getFullYear();
+    const m = today.getMonth() + 1;
+    const d = today.getDate();
+
+    const reiwaYear = y - 2018;
+    const semester = (m >= 4 && m <= 9) ? "前期分" : "後期分";
+    document.getElementById('scheduleTitle').value = `見守り活動・挨拶運動シフト表 令和${reiwaYear}年度 ${semester}`;
+    document.getElementById('scheduleCreatedDate').value = `作成日：${y}年${m}月${d}日`;
+
+    const startStr = formatDate(today);
+    document.getElementById('startDate').value = startStr;
+
+    const end = new Date(today);
+    end.setDate(end.getDate() + 170);
+    const endStr = formatDate(end);
+    document.getElementById('endDate').value = endStr;
+
+    const holidays = generateJapaneseHolidays(y, y + 1);
+    const filteredHolidays = holidays.filter(h => h.date >= startStr && h.date <= endStr);
+    
+    const holidayLines = filteredHolidays.map(h => `${h.date},${h.name}`);
+    if (m >= 9 || m <= 1) {
+      const targetY = (m >= 9) ? y : y - 1;
+      holidayLines.push(`${targetY}-12-28,冬季休業`);
+      holidayLines.push(`${targetY}-12-30,冬季休業`);
+      holidayLines.push(`${targetY + 1}-01-04,冬季休業`);
+      holidayLines.push(`${targetY + 1}-01-06,冬季休業`);
+    }
+    holidayLines.sort();
+    document.getElementById('holidayList').value = holidayLines.join('\n');
+
+    const sp1 = new Date(today); sp1.setDate(sp1.getDate() + 10);
+    const sp2 = new Date(today); sp2.setDate(sp2.getDate() + 11);
+    document.getElementById('specialList').value = 
+      `${formatDate(sp1)},役員A,重点見守り日\n` +
+      `${formatDate(sp2)},,重点見守り日`;
+  }
+
+  function formatDate(d) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function generateJapaneseHolidays(startYear, endYear) {
+    const list = [];
+    for (let yr = startYear; yr <= endYear; yr++) {
+      addH(list, yr, 1, 1, "元日");
+      addH(list, yr, 2, 11, "建国記念の日");
+      addH(list, yr, 2, 23, "天皇誕生日");
+      addH(list, yr, 4, 29, "昭和の日");
+      addH(list, yr, 5, 3, "憲法記念日");
+      addH(list, yr, 5, 4, "みどりの日");
+      addH(list, yr, 5, 5, "こどもの日");
+      addH(list, yr, 8, 11, "山の日");
+      addH(list, yr, 11, 3, "文化の日");
+      addH(list, yr, 11, 23, "勤労感謝の日");
+
+      addHappyMonday(list, yr, 1, 2, "成人の日");
+      addHappyMonday(list, yr, 7, 3, "海の日");
+      addHappyMonday(list, yr, 9, 3, "敬老の日");
+      addHappyMonday(list, yr, 10, 2, "スポーツの日");
+
+      const shunbunDay = Math.floor(20.8431 + 0.242194 * (yr - 1980) - Math.floor((yr - 1980) / 4));
+      const shubunDay = Math.floor(23.2488 + 0.242194 * (yr - 1980) - Math.floor((yr - 1980) / 4));
+      addH(list, yr, 3, shunbunDay, "春分の日");
+      addH(list, yr, 9, shubunDay, "秋分の日");
+    }
+
+    const holidayDates = new Set(list.map(h => h.date));
+    const furikaeList = [];
+    list.forEach(h => {
+      const dt = new Date(h.date + "T00:00:00");
+      if (dt.getDay() === 0) {
+        let nextD = new Date(dt);
+        nextD.setDate(nextD.getDate() + 1);
+        let nextDStr = formatDate(nextD);
+        while (holidayDates.has(nextDStr)) {
+          nextD.setDate(nextD.getDate() + 1);
+          nextDStr = formatDate(nextD);
+        }
+        furikaeList.push({ date: nextDStr, name: "振替休日" });
+      }
+    });
+
+    return list.concat(furikaeList).sort((a, b) => a.date.localeCompare(b.date));
+  }
+
+  function addH(list, y, m, d, name) {
+    const str = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+    list.push({ date: str, name: name });
+  }
+
+  function addHappyMonday(list, y, m, nth, name) {
+    let count = 0;
+    for (let day = 1; day <= 31; day++) {
+      const d = new Date(y, m - 1, day);
+      if (d.getMonth() !== m - 1) break;
+      if (d.getDay() === 1) {
+        count++;
+        if (count === nth) {
+          addH(list, y, m, day, name);
+          break;
+        }
+      }
+    }
+  }
+
+  function checkMemberDuplicates() {
+    const raw = document.getElementById('memberList').value;
+    const lines = raw.split('\n').map(s => s.trim()).filter(s => s !== '');
+    const counts = {};
+    const duplicates = [];
+
+    lines.forEach(name => {
+      counts[name] = (counts[name] || 0) + 1;
+      if (counts[name] === 2) {
+        duplicates.push(name);
+      }
+    });
+
+    const alertEl = document.getElementById('duplicateAlert');
+    const namesEl = document.getElementById('duplicateNames');
+    const textEl = document.getElementById('memberList');
+
+    if (duplicates.length > 0) {
+      namesEl.innerText = duplicates.join("、 ");
+      alertEl.style.display = 'block';
+      textEl.classList.add('error-border');
+    } else {
+      alertEl.style.display = 'none';
+      textEl.classList.remove('error-border');
+    }
+    return duplicates;
+  }
+
+  function toggleSummary() {
+    const content = document.getElementById('summaryAccordion');
+    const arrow = document.getElementById('accordionArrow');
+    if (content.classList.contains('open')) {
+      content.classList.remove('open');
+      arrow.innerText = '▼';
+    } else {
+      content.classList.add('open');
+      arrow.innerText = '▲';
+    }
+  }
+
+  function getSelectedWeekdays() {
+    const checkboxes = document.querySelectorAll('input[name="weekday"]:checked');
+    return Array.from(checkboxes).map(cb => parseInt(cb.value));
+  }
+
+  function generateSchedule() {
+    const titleVal = document.getElementById('scheduleTitle').value;
+    const createdDateVal = document.getElementById('scheduleCreatedDate').value;
+    const districtVal = document.getElementById('metaDistrict').value;
+    const locVal = document.getElementById('metaLocation').value;
+    const timeVal = document.getElementById('metaTime').value;
+
+    document.getElementById('displayTitle').innerText = titleVal;
+    document.getElementById('displayCreatedDate').innerText = createdDateVal;
+    document.getElementById('displayDistrict').innerText = districtVal;
+    document.getElementById('displayLocation').innerText = locVal;
+    document.getElementById('displayTime').innerText = timeVal;
+
+    const selectedDays = getSelectedWeekdays();
+    const dayStrList = selectedDays.map(d => dayNames[d] + "曜").join("・");
+    document.getElementById('displayWeekdays').innerText = dayStrList ? `${dayStrList}（祝日・学校休校日を除く）` : "指定なし";
+
+    const headerMsgVal = document.getElementById('headerMsg').value.trim();
+    const headerMsgEl = document.getElementById('displayHeaderMsg');
+    if (headerMsgVal) {
+      headerMsgEl.innerText = headerMsgVal;
+      headerMsgEl.style.display = 'block';
+    } else {
+      headerMsgEl.style.display = 'none';
+    }
+
+    const footerMsgVal = document.getElementById('footerMsg').value.trim();
+    const footerMsgEl = document.getElementById('displayFooterMsg');
+    if (footerMsgVal) {
+      footerMsgEl.innerText = footerMsgVal;
+      footerMsgEl.style.display = 'block';
+    } else {
+      footerMsgEl.style.display = 'none';
+    }
+
+    const contactMsgVal = document.getElementById('contactMsg').value.trim();
+    const contactMsgEl = document.getElementById('displayContactMsg');
+    if (contactMsgVal) {
+      contactMsgEl.innerText = contactMsgVal;
+      contactMsgEl.style.display = 'block';
+    } else {
+      contactMsgEl.style.display = 'none';
+    }
+
+    const startStr = document.getElementById('startDate').value;
+    const endStr = document.getElementById('endDate').value;
+    if (!startStr || !endStr) {
+      alert("開始日と終了日を設定してください。");
+      return;
+    }
+
+    const members = document.getElementById('memberList').value
+      .split('\n').map(s => s.trim()).filter(s => s !== '');
+    if (members.length === 0) {
+      alert("名簿に1名以上のメンバーを入力してください。");
+      return;
+    }
+
+    const holidayMap = new Map();
+    document.getElementById('holidayList').value.split('\n').forEach(line => {
+      const parts = line.split(',').map(s => s.trim());
+      if (parts.length >= 2 && parts[0]) holidayMap.set(parts[0], parts[1]);
+    });
+
+    const specialMap = new Map();
+    document.getElementById('specialList').value.split('\n').forEach(line => {
+      const parts = line.split(',').map(s => s.trim());
+      if (parts.length >= 1 && parts[0]) {
+        specialMap.set(parts[0], {
+          fixedPerson: parts[1] || "",
+          label: parts[2] || "特別枠"
+        });
+      }
+    });
+
+    let curr = new Date(startStr);
+    const endDate = new Date(endStr);
+    const allDateSet = new Set();
+
+    while (curr <= endDate) {
+      const dNum = curr.getDay();
+      if (selectedDays.includes(dNum)) {
+        allDateSet.add(curr.toISOString().split('T')[0]);
+      }
+      curr.setDate(curr.getDate() + 1);
+    }
+
+    specialMap.forEach((_, dateKey) => {
+      if (dateKey >= startStr && dateKey <= endStr) {
+        allDateSet.add(dateKey);
+      }
+    });
+
+    const sortedDates = Array.from(allDateSet).sort();
+    let memberIndex = 0;
+    const memberStats = {};
+    members.forEach(m => memberStats[m] = { regular: 0, special: 0 });
+
+    generatedData = [];
+
+    sortedDates.forEach(dateKey => {
+      const d = new Date(dateKey + "T00:00:00");
+      const dayStr = dayNames[d.getDay()];
+
+      if (holidayMap.has(dateKey)) {
+        generatedData.push({
+          date: dateKey,
+          day: dayStr,
+          type: "holiday",
+          tag: "休み",
+          person: "-",
+          note: holidayMap.get(dateKey)
+        });
+      } else if (specialMap.has(dateKey)) {
+        const sp = specialMap.get(dateKey);
+        let assigned = sp.fixedPerson;
+
+        if (!assigned) {
+          assigned = members[memberIndex % members.length];
+          memberIndex++;
+        }
+
+        if (!memberStats[assigned]) memberStats[assigned] = { regular: 0, special: 0 };
+        memberStats[assigned].special += 1;
+
+        generatedData.push({
+          date: dateKey,
+          day: dayStr,
+          type: "special",
+          tag: sp.label,
+          person: assigned,
+          note: sp.label
+        });
+      } else {
+        const assigned = members[memberIndex % members.length];
+        memberIndex++;
+
+        if (!memberStats[assigned]) memberStats[assigned] = { regular: 0, special: 0 };
+        memberStats[assigned].regular += 1;
+
+        generatedData.push({
+          date: dateKey,
+          day: dayStr,
+          type: "regular",
+          tag: "通常",
+          person: assigned,
+          note: ""
+        });
+      }
+    });
+
+    renderMultiColumnTables();
+    renderSummary(memberStats);
+  }
+
+  function renderMultiColumnTables() {
+    const container = document.getElementById('scheduleContainer');
+    container.innerHTML = "";
+
+    const numCols = parseInt(document.getElementById('layoutColumns').value);
+    const total = generatedData.length;
+    if (total === 0) return;
+
+    const itemsPerCol = Math.ceil(total / numCols);
+
+    for (let c = 0; c < numCols; c++) {
+      const colItems = generatedData.slice(c * itemsPerCol, (c + 1) * itemsPerCol);
+      if (colItems.length === 0 && c > 0) continue;
+
+      const colWrapper = document.createElement('div');
+      colWrapper.className = 'column-table-wrapper';
+
+      let html = `<table class="schedule-table">
+        <thead>
+          <tr>
+            <th style="width: 42%;">月日(曜)</th>
+            <th style="width: 58%;">担当 / 事由</th>
+          </tr>
+        </thead>
+        <tbody>`;
+
+      for (let i = 0; i < itemsPerCol; i++) {
+        if (i < colItems.length) {
+          const item = colItems[i];
+          const md = item.date.slice(5).replace('-', '/');
+          const dateWithDay = `${md}(${item.day})`;
+
+          if (item.type === 'holiday') {
+            html += `<tr class="row-holiday">
+              <td>${dateWithDay}</td>
+              <td><strong>${item.note}</strong></td>
+            </tr>`;
+          } else if (item.type === 'special') {
+            html += `<tr class="row-special">
+              <td>${dateWithDay}</td>
+              <td><span class="badge-special">★${item.note}:</span><strong>${item.person}</strong></td>
+            </tr>`;
+          } else {
+            html += `<tr>
+              <td>${dateWithDay}</td>
+              <td>${item.person}</td>
+            </tr>`;
+          }
+        } else {
+          html += `<tr><td>&nbsp;</td><td></td></tr>`;
+        }
+      }
+
+      html += `</tbody></table>`;
+      colWrapper.innerHTML = html;
+      container.appendChild(colWrapper);
+    }
+  }
+
+  function renderSummary(stats) {
+    const container = document.getElementById('summaryContainer');
+    container.innerHTML = "";
+
+    for (const [name, count] of Object.entries(stats)) {
+      const div = document.createElement('div');
+      div.className = 'summary-item';
+      div.innerHTML = `<strong>${name}</strong><br>通常: ${count.regular}回<br><span style="color:var(--accent); font-size:0.75rem;">特別: ${count.special}回</span>`;
+      container.appendChild(div);
+    }
+  }
+
+  // 印刷・PDF保存実行（ガード解除）
+  function handlePrint() {
+    markSaved();
+    window.print();
+  }
+
+  // 設定保存（ガード解除）
+  function exportJSON() {
+    const data = {
+      title: document.getElementById('scheduleTitle').value,
+      createdDate: document.getElementById('scheduleCreatedDate').value,
+      orientation: document.getElementById('printOrientation').value,
+      district: document.getElementById('metaDistrict').value,
+      location: document.getElementById('metaLocation').value,
+      time: document.getElementById('metaTime').value,
+      startDate: document.getElementById('startDate').value,
+      endDate: document.getElementById('endDate').value,
+      layoutColumns: document.getElementById('layoutColumns').value,
+      weekdays: getSelectedWeekdays(),
+      headerMsg: document.getElementById('headerMsg').value,
+      footerMsg: document.getElementById('footerMsg').value,
+      contactMsg: document.getElementById('contactMsg').value,
+      members: document.getElementById('memberList').value,
+      holidays: document.getElementById('holidayList').value,
+      specials: document.getElementById('specialList').value
+    };
+
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `HataFuRotto設定_${data.district || 'PTA'}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    markSaved();
+  }
+
+  // 設定読み込み（復元後にガード解除）
+  function importJSON(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      try {
+        const data = JSON.parse(e.target.result);
+        if (data.title !== undefined) document.getElementById('scheduleTitle').value = data.title;
+        if (data.createdDate !== undefined) document.getElementById('scheduleCreatedDate').value = data.createdDate;
+        if (data.orientation !== undefined) {
+          document.getElementById('printOrientation').value = data.orientation;
+          updatePrintPageStyle();
+        }
+        if (data.district !== undefined) document.getElementById('metaDistrict').value = data.district;
+        if (data.location !== undefined) document.getElementById('metaLocation').value = data.location;
+        if (data.time !== undefined) document.getElementById('metaTime').value = data.time;
+        if (data.startDate !== undefined) document.getElementById('startDate').value = data.startDate;
+        if (data.endDate !== undefined) document.getElementById('endDate').value = data.endDate;
+        if (data.layoutColumns !== undefined) document.getElementById('layoutColumns').value = data.layoutColumns;
+        if (data.headerMsg !== undefined) document.getElementById('headerMsg').value = data.headerMsg;
+        if (data.footerMsg !== undefined) document.getElementById('footerMsg').value = data.footerMsg;
+        if (data.contactMsg !== undefined) document.getElementById('contactMsg').value = data.contactMsg;
+        if (data.members !== undefined) document.getElementById('memberList').value = data.members;
+        if (data.holidays !== undefined) document.getElementById('holidayList').value = data.holidays;
+        if (data.specials !== undefined) document.getElementById('specialList').value = data.specials;
+
+        if (Array.isArray(data.weekdays)) {
+          document.querySelectorAll('input[name="weekday"]').forEach(cb => {
+            cb.checked = data.weekdays.includes(parseInt(cb.value));
+          });
+        }
+
+        checkMemberDuplicates();
+        generateSchedule();
+        markSaved();
+        alert("設定ファイルを正常に読み込みました。");
+      } catch (err) {
+        alert("設定ファイルの読み込みに失敗しました。形式を確認してください。");
+      }
+    };
+    reader.readAsText(file);
+    event.target.value = "";
+  }
+
+  function copyForLine() {
+    if (generatedData.length === 0) {
+      alert("先にシフトを作成してください。");
+      return;
+    }
+    const titleVal = document.getElementById('scheduleTitle').value;
+    const distVal = document.getElementById('metaDistrict').value;
+    const locVal = document.getElementById('metaLocation').value;
+    const timeVal = document.getElementById('metaTime').value;
+    const headerVal = document.getElementById('headerMsg').value.trim();
+    const footerVal = document.getElementById('footerMsg').value.trim();
+    const contactVal = document.getElementById('contactMsg').value.trim();
+
+    let text = `【${titleVal}】\n`;
+    text += `地区: ${distVal}\n場所: ${locVal}\n時間: ${timeVal}\n`;
+    if (headerVal) text += `\n${headerVal}\n`;
+    text += `--------------------\n`;
+    generatedData.forEach(item => {
+      const md = item.date.slice(5).replace('-', '/');
+      if (item.type === 'holiday') {
+        text += `${md}(${item.day}): 休み（${item.note}）\n`;
+      } else if (item.type === 'special') {
+        text += `${md}(${item.day}): ★${item.person}（${item.note}）\n`;
+      } else {
+        text += `${md}(${item.day}): ${item.person}\n`;
+      }
+    });
+    text += `--------------------\n`;
+    if (footerVal) text += `${footerVal}\n`;
+    if (contactVal) text += `${contactVal}\n`;
+
+    navigator.clipboard.writeText(text).then(() => {
+      alert("LINE送信用テキストをクリップボードにコピーしました！");
+    }).catch(() => {
+      alert("コピーに失敗しました。手動で選択してください。");
+    });
+  }
+</script>
+
+</body>
+</html>
