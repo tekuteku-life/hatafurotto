@@ -41,6 +41,7 @@
     }
     textarea { height: 130px; resize: vertical; line-height: 1.4; }
     textarea.msg-area { height: 85px; }
+    textarea.time-area { height: 44px; min-height: 38px; }
     textarea.error-border { border-color: var(--danger) !important; background-color: #fff8f8; }
     .help-text { font-size: 0.72rem; color: #666; margin-top: 2px; }
     .alert-error { color: var(--danger); font-size: 0.78rem; font-weight: bold; margin-top: 3px; display: none; }
@@ -85,9 +86,9 @@
     .sheet-top-date { text-align: right; font-size: 0.8rem; color: #444; margin-bottom: 2px; }
     .sheet-header { margin-bottom: 8px; border-bottom: 2px solid #333; padding-bottom: 6px; }
     .sheet-title { font-size: 1.25rem; font-weight: bold; text-align: center; margin-bottom: 6px; letter-spacing: 1px; }
-    .sheet-meta-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
-    .sheet-meta-table td { border: 1px solid #777; padding: 4px 8px; }
-    .sheet-meta-label { background: #eee; font-weight: bold; width: 12%; text-align: center; }
+    .sheet-meta-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; table-layout: fixed; }
+    .sheet-meta-table td { border: 1px solid #777; padding: 4px 6px; vertical-align: middle; }
+    .sheet-meta-label { background: #eee; font-weight: bold; width: 8%; text-align: center; }
 
     .sheet-msg-box {
       border: 1px solid #777; background: #fff; border-radius: 4px;
@@ -174,8 +175,8 @@
         <input type="text" id="metaLocation" value="〇〇交差点・小学校正門前">
       </div>
       <div class="form-group">
-        <label>活動時間</label>
-        <input type="text" id="metaTime" value="7:55 〜 8:25">
+        <label>活動時間（改行で2段表示も可能）</label>
+        <textarea id="metaTime" class="time-area">7:55 〜 8:25</textarea>
       </div>
     </div>
 
@@ -237,7 +238,7 @@
       <input type="text" id="contactMsg" value="校外委員連絡先：〇〇地区担当 鈴木（TEL: 090-XXXX-XXXX / LINEまたはメール）">
     </div>
 
-    <h2>4. 名簿・祝日・特別追加枠（重複チェック付き）</h2>
+    <h2>4. 名簿・祝日・特別追加枠（重複チェック＆期間範囲指定対応）</h2>
     <div class="grid-3">
       <div class="form-group">
         <label>名簿メンバー（改行区切り）</label>
@@ -256,13 +257,13 @@
       <div class="form-group">
         <label>祝日・学校休校日（日付,理由）</label>
         <textarea id="holidayList"></textarea>
-        <div class="help-text">※開いた年・翌年の祝日を自動抽出しています。学校独自の休みも追記可能です。</div>
+        <div class="help-text">※「2026/12/25〜2027/1/7,冬休み」のように期間の波線指定（〜）に対応。1桁月日（yyyy-m-d）も可。</div>
       </div>
 
       <div class="form-group">
         <label>特別追加枠（日付,担当者,事由）</label>
         <textarea id="specialList"></textarea>
-        <div class="help-text">※担当者を空欄（例: <code>2026-10-15,,重点日</code>）にすると通常名簿から自動割り当てします。</div>
+        <div class="help-text">※担当者空欄で自動順送り。期間範囲（〜）指定も可能。</div>
       </div>
     </div>
   </div>
@@ -296,12 +297,12 @@
     <div class="sheet-title" id="displayTitle"></div>
     <table class="sheet-meta-table">
       <tr>
-        <td class="sheet-meta-label">地区</td>
-        <td id="displayDistrict" style="width: 21%;">第1地区</td>
-        <td class="sheet-meta-label">場所</td>
+        <td class="sheet-meta-label" style="width: 8%;">地区</td>
+        <td id="displayDistrict" style="width: 14%;">第1地区</td>
+        <td class="sheet-meta-label" style="width: 8%;">場所</td>
         <td id="displayLocation" style="width: 32%;">〇〇交差点・小学校正門前</td>
-        <td class="sheet-meta-label">時間</td>
-        <td id="displayTime" style="width: 23%;">7:55 〜 8:25</td>
+        <td class="sheet-meta-label" style="width: 8%;">時間</td>
+        <td id="displayTime" style="width: 30%; white-space: pre-wrap; line-height: 1.25;">7:55 〜 8:25</td>
       </tr>
       <tr>
         <td class="sheet-meta-label">実施曜日</td>
@@ -326,8 +327,6 @@
 <script>
   let generatedData = [];
   const dayNames = ["日", "月", "火", "水", "木", "金", "土"];
-  
-  // 未保存・未印刷ガード用フラグ
   let isDirty = false;
 
   function markDirty() {
@@ -348,11 +347,25 @@
     }
   }
 
+  // 作成日文字列から YYYYMMDD の数字文字列を抽出する関数
+  function getCreatedDateForFilename() {
+    const raw = document.getElementById('scheduleCreatedDate').value;
+    const nums = raw.match(/\d+/g);
+    if (nums && nums.length >= 3) {
+      const y = nums[0];
+      const m = nums[1].padStart(2, '0');
+      const d = nums[2].padStart(2, '0');
+      return `${y}${m}${d}`;
+    }
+    const today = new Date();
+    return formatDate(today).replace(/-/g, '');
+  }
+
   // ページ離脱・リロード時の確認ガード
   window.addEventListener('beforeunload', function (e) {
     if (isDirty) {
       e.preventDefault();
-      e.returnValue = ''; // ブラウザ標準の「このサイトを離れますか？」を表示
+      e.returnValue = '';
       return '';
     }
   });
@@ -363,7 +376,6 @@
     checkMemberDuplicates();
     generateSchedule();
 
-    // 入力変更監視（ユーザーが手動変更したらダーティフラグをセット）
     const inputs = document.querySelectorAll('input, select, textarea');
     inputs.forEach(el => {
       el.addEventListener('input', markDirty);
@@ -371,8 +383,6 @@
     });
 
     document.getElementById('memberList').addEventListener('input', checkMemberDuplicates);
-
-    // 初回ロード時は未変更状態にする
     markSaved();
   };
 
@@ -381,6 +391,37 @@
     const styleEl = document.getElementById('printPageStyle');
     const margin = orientation === 'landscape' ? '6mm 8mm' : '7mm 8mm';
     styleEl.innerHTML = `@page { size: A4 ${orientation}; margin: ${margin}; }`;
+  }
+
+  function normalizeDateStr(dStr) {
+    if (!dStr) return null;
+    const m = dStr.trim().match(/^(\d{4})[\/\-\.](\d{1,2})[\/\-\.](\d{1,2})$/);
+    if (!m) return null;
+    const y = m[1];
+    const mon = m[2].padStart(2, '0');
+    const d = m[3].padStart(2, '0');
+    return `${y}-${mon}-${d}`;
+  }
+
+  function expandDateOrRange(datePart) {
+    if (!datePart) return [];
+    const parts = datePart.split(/[\~〜]/);
+    if (parts.length === 2) {
+      const startStr = normalizeDateStr(parts[0]);
+      const endStr = normalizeDateStr(parts[1]);
+      if (startStr && endStr) {
+        const dates = [];
+        let curr = new Date(startStr + "T00:00:00");
+        const endD = new Date(endStr + "T00:00:00");
+        while (curr <= endD) {
+          dates.push(formatDate(curr));
+          curr.setDate(curr.getDate() + 1);
+        }
+        return dates;
+      }
+    }
+    const single = normalizeDateStr(datePart);
+    return single ? [single] : [];
   }
 
   function initDynamicDates() {
@@ -408,10 +449,9 @@
     const holidayLines = filteredHolidays.map(h => `${h.date},${h.name}`);
     if (m >= 9 || m <= 1) {
       const targetY = (m >= 9) ? y : y - 1;
-      holidayLines.push(`${targetY}-12-28,冬季休業`);
-      holidayLines.push(`${targetY}-12-30,冬季休業`);
-      holidayLines.push(`${targetY + 1}-01-04,冬季休業`);
-      holidayLines.push(`${targetY + 1}-01-06,冬季休業`);
+      holidayLines.push(`${targetY}-12-25〜${targetY + 1}-01-07,冬季休業`);
+    } else if (m >= 4 && m <= 7) {
+      holidayLines.push(`${y}-07-21〜${y}-08-31,夏季休業`);
     }
     holidayLines.sort();
     document.getElementById('holidayList').value = holidayLines.join('\n');
@@ -583,10 +623,10 @@
       contactMsgEl.style.display = 'none';
     }
 
-    const startStr = document.getElementById('startDate').value;
-    const endStr = document.getElementById('endDate').value;
+    const startStr = normalizeDateStr(document.getElementById('startDate').value);
+    const endStr = normalizeDateStr(document.getElementById('endDate').value);
     if (!startStr || !endStr) {
-      alert("開始日と終了日を設定してください。");
+      alert("開始日と終了日を正しい形式で設定してください。");
       return;
     }
 
@@ -600,28 +640,34 @@
     const holidayMap = new Map();
     document.getElementById('holidayList').value.split('\n').forEach(line => {
       const parts = line.split(',').map(s => s.trim());
-      if (parts.length >= 2 && parts[0]) holidayMap.set(parts[0], parts[1]);
+      if (parts.length >= 2 && parts[0]) {
+        const dates = expandDateOrRange(parts[0]);
+        dates.forEach(dKey => holidayMap.set(dKey, parts[1]));
+      }
     });
 
     const specialMap = new Map();
     document.getElementById('specialList').value.split('\n').forEach(line => {
       const parts = line.split(',').map(s => s.trim());
       if (parts.length >= 1 && parts[0]) {
-        specialMap.set(parts[0], {
-          fixedPerson: parts[1] || "",
-          label: parts[2] || "特別枠"
+        const dates = expandDateOrRange(parts[0]);
+        dates.forEach(dKey => {
+          specialMap.set(dKey, {
+            fixedPerson: parts[1] || "",
+            label: parts[2] || "特別枠"
+          });
         });
       }
     });
 
-    let curr = new Date(startStr);
-    const endDate = new Date(endStr);
+    let curr = new Date(startStr + "T00:00:00");
+    const endDate = new Date(endStr + "T00:00:00");
     const allDateSet = new Set();
 
     while (curr <= endDate) {
       const dNum = curr.getDay();
       if (selectedDays.includes(dNum)) {
-        allDateSet.add(curr.toISOString().split('T')[0]);
+        allDateSet.add(formatDate(curr));
       }
       curr.setDate(curr.getDate() + 1);
     }
@@ -765,13 +811,28 @@
     }
   }
 
-  // 印刷・PDF保存実行（ガード解除）
+  // 印刷・PDF保存実行（PDFファイル名を自動変更してダイアログを開く）
   function handlePrint() {
     markSaved();
+
+    const titleVal = document.getElementById('scheduleTitle').value.trim() || 'シフト表';
+    const distVal = document.getElementById('metaDistrict').value.trim() || 'PTA';
+    const datePostfix = getCreatedDateForFilename();
+    
+    // PDF保存時のデフォルトファイル名（titleタグの内容が採用される）
+    const pdfFileName = `${titleVal}_${distVal}_${datePostfix}`.replace(/[\/\\:\*\?"<>\|]/g, '_');
+    const originalTitle = document.title;
+
+    document.title = pdfFileName;
     window.print();
+
+    // 印刷ダイアログ終了後に元のWebタイトルに戻す
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 1200);
   }
 
-  // 設定保存（ガード解除）
+  // 設定保存（postfixに作成日 YYYYMMDD を付与）
   function exportJSON() {
     const data = {
       title: document.getElementById('scheduleTitle').value,
@@ -792,18 +853,19 @@
       specials: document.getElementById('specialList').value
     };
 
+    const datePostfix = getCreatedDateForFilename();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `HataFuRotto設定_${data.district || 'PTA'}.json`;
+    // ファイル名末尾に作成日（YYYYMMDD）を付加
+    a.download = `HataFuRotto設定_${data.district || 'PTA'}_${datePostfix}.json`;
     a.click();
     URL.revokeObjectURL(url);
 
     markSaved();
   }
 
-  // 設定読み込み（復元後にガード解除）
   function importJSON(event) {
     const file = event.target.files[0];
     if (!file) return;
